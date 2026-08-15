@@ -109,6 +109,6 @@ Initial architecture and requirements are being established.
 
 ## Organization
 
-Developed by **STN-LABZ**.
+Developed by **[STN-LABZ](https://www.stn-labz.com)**.
 
 **Engineering systems worthy of trust when trust matters most.**

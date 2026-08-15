@@ -1,0 +1,66 @@
+# Build output
+build/
+bin/
+obj/
+out/
+dist/
+
+# Compiled artifacts
+*.exe
+*.dll
+*.lib
+*.obj
+*.o
+*.a
+*.so
+*.dylib
+*.pdb
+*.ilk
+*.exp
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / editor state
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+
+# Logs and runtime output
+logs/
+*.log
+
+# Generated RAG output
+rag_output/
+generated/
+manifests/
+
+# Local configuration and secrets
+*.local.json
+*.local.ini
+*.local.conf
+.env
+.env.*
+!.env.example
+
+# Test artifacts
+coverage/
+test-output/
+test-results/
+
+# Archives
+*.7z
+*.tar
+*.tar.gz

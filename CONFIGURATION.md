@@ -11,7 +11,7 @@ The first supported source type is a local directory containing STN-LABZ Markdow
 Initial development source:
 
 ```text
-C:\Users\Poe\Desktop\STN-Labz\Policies
+C:\Users\XX\Desktop\STN-Labz\Policies
 ```
 
 The path is a development default and will remain configurable.

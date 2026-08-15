@@ -1,5 +1,10 @@
 # rag_builder
 
+![Language](https://img.shields.io/badge/Language-ISO%20C-blue)
+![Status](https://img.shields.io/badge/Status-Active%20Development-orange)
+![Architecture](https://img.shields.io/badge/Architecture-Modular-blueviolet)
+![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey)
+
 **STN-LABZ Configurable RAG Creation System**
 
 `rag_builder` is an ISO C application for building structured, traceable knowledge for AI consumption.

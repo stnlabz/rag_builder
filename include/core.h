@@ -2,6 +2,9 @@
 #define RAG_BUILDER_CORE_H
 
 #include "config.h"
+#include "log.h"
+#include "module_catalog.h"
+#include "module_registry.h"
 
 typedef enum
 {
@@ -21,6 +24,7 @@ typedef enum
     RB_ERR_INVALID_STATE,
     RB_ERR_INITIALIZATION,
     RB_ERR_ENVIRONMENT,
+    RB_ERR_LOGGING,
     RB_ERR_RUNTIME,
     RB_ERR_SHUTDOWN
 } rb_result_t;
@@ -29,6 +33,13 @@ typedef struct
 {
     rb_core_state_t state;
     rb_result_t last_result;
+
+    rb_config_t config;
+
+    rb_log_t log;
+
+    rb_module_catalog_t module_catalog;
+    rb_module_registry_t module_registry;
 } rb_core_t;
 
 rb_result_t rb_core_init(

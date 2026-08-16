@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="rag_builder_test.vcxproj" />
+  <Project Path="rag_builder_test.vcxproj" Id="bc37d36e-ae9c-4164-a093-c6a481ac1050" />
 </Solution>

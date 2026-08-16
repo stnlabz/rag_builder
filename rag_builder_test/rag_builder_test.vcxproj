@@ -111,7 +111,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Users\Poe\Documents\GitHub\rag_builder\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Poe\Documents\GitHub\rag_builder\modules\markdown\include;C:\Users\Poe\Documents\GitHub\rag_builder\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -140,8 +140,14 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\modules\markdown\src\markdown.c" />
     <ClCompile Include="..\src\config.c" />
     <ClCompile Include="..\src\core.c" />
+    <ClCompile Include="..\src\log.c" />
+    <ClCompile Include="..\src\module.c" />
+    <ClCompile Include="..\src\module_catalog.c" />
+    <ClCompile Include="..\src\module_discovery_win.c" />
+    <ClCompile Include="..\src\module_registry.c" />
     <ClCompile Include="..\src\platform_win.c" />
     <ClCompile Include="..\tests\acl_fixture_win.c" />
     <ClCompile Include="..\tests\core_state_test.c" />
@@ -149,8 +155,14 @@
   <ItemGroup>
     <ClInclude Include="..\include\config.h" />
     <ClInclude Include="..\include\core.h" />
+    <ClInclude Include="..\include\log.h" />
+    <ClInclude Include="..\include\module.h" />
+    <ClInclude Include="..\include\module_catalog.h" />
+    <ClInclude Include="..\include\module_discovery.h" />
+    <ClInclude Include="..\include\module_registry.h" />
     <ClInclude Include="..\include\platform.h" />
     <ClInclude Include="..\include\version.h" />
+    <ClInclude Include="..\modules\markdown\include\markdown.h" />
     <ClInclude Include="..\tests\acl_fixture_win.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

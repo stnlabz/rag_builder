@@ -2,12 +2,19 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 
+#include <direct.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "acl_fixture_win.h"
 #include "config.h"
 #include "core.h"
+#include "log.h"
+#include "markdown.h"
+#include "module.h"
+#include "module_catalog.h"
+#include "module_registry.h"
 #include "platform.h"
 
 #define TEST_CONFIG_VALID        "rb_test_valid.conf"
@@ -20,6 +27,30 @@
 
 #define TEST_SOURCE_UNREADABLE   "rb_test_unreadable_source"
 #define TEST_OUTPUT_UNWRITABLE   "rb_test_unwritable_output"
+
+#define TEST_MODULE_ROOT         "rb_test_modules"
+
+#define TEST_MODULE_DIRECTORY    \
+    "rb_test_modules\\qualification_fixture"
+
+#define TEST_MODULE_CONFIG       \
+    "rb_test_modules\\qualification_fixture\\module.conf"
+
+#define TEST_MARKDOWN_DIRECTORY  \
+    "rb_test_modules\\markdown"
+
+#define TEST_MARKDOWN_CONFIG     \
+    "rb_test_modules\\markdown\\module.conf"
+
+#define TEST_MODULE_ID           "RB-TEST-MODULE"
+#define TEST_MODULE_NAME         "Qualification Fixture"
+
+#define TEST_LOG_FILE            "rag_builder.log"
+#define TEST_LOG_INFO_MARKER     "LG01_INFO_MARKER"
+#define TEST_LOG_DEBUG_MARKER    "LG01_DEBUG_MARKER"
+
+
+static unsigned int module_test_invocations = 0;
 
 
 static int write_test_file(
@@ -34,7 +65,10 @@ static int write_test_file(
         return EXIT_FAILURE;
     }
 
-    file = fopen(path, "w");
+    file = fopen(
+        path,
+        "w"
+    );
 
     if (file == NULL)
     {
@@ -47,7 +81,10 @@ static int write_test_file(
         return EXIT_FAILURE;
     }
 
-    if (fputs(content, file) == EOF)
+    if (fputs(
+        content,
+        file
+    ) == EOF)
     {
         fclose(file);
 
@@ -86,6 +123,189 @@ static void remove_test_file(
 }
 
 
+static int file_contains_text(
+    const char* path,
+    const char* text
+)
+{
+    FILE* file;
+    char line[1024];
+
+    if (path == NULL || text == NULL)
+    {
+        return 0;
+    }
+
+    file = fopen(
+        path,
+        "r"
+    );
+
+    if (file == NULL)
+    {
+        return 0;
+    }
+
+    while (fgets(
+        line,
+        sizeof(line),
+        file
+    ) != NULL)
+    {
+        if (strstr(
+            line,
+            text
+        ) != NULL)
+        {
+            fclose(file);
+            return 1;
+        }
+    }
+
+    fclose(file);
+
+    return 0;
+}
+
+
+static void cleanup_module_fixture(void)
+{
+    remove_test_file(
+        TEST_MODULE_CONFIG
+    );
+
+    (void)_rmdir(
+        TEST_MODULE_DIRECTORY
+    );
+
+    (void)_rmdir(
+        TEST_MODULE_ROOT
+    );
+}
+
+
+static int create_module_fixture(void)
+{
+    cleanup_module_fixture();
+
+    if (_mkdir(TEST_MODULE_ROOT) != 0)
+    {
+        fprintf(
+            stderr,
+            "[FAIL] MG01 unable to create module root: %s\n",
+            TEST_MODULE_ROOT
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    if (_mkdir(TEST_MODULE_DIRECTORY) != 0)
+    {
+        fprintf(
+            stderr,
+            "[FAIL] MG01 unable to create module directory: %s\n",
+            TEST_MODULE_DIRECTORY
+        );
+
+        cleanup_module_fixture();
+
+        return EXIT_FAILURE;
+    }
+
+    if (write_test_file(
+        TEST_MODULE_CONFIG,
+        "id=" TEST_MODULE_ID "\n"
+    ) != EXIT_SUCCESS)
+    {
+        cleanup_module_fixture();
+
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+
+static void cleanup_markdown_fixture(void)
+{
+    remove_test_file(
+        TEST_MARKDOWN_CONFIG
+    );
+
+    (void)_rmdir(
+        TEST_MARKDOWN_DIRECTORY
+    );
+
+    (void)_rmdir(
+        TEST_MODULE_ROOT
+    );
+}
+
+
+static int create_markdown_fixture(void)
+{
+    cleanup_markdown_fixture();
+
+    if (_mkdir(TEST_MODULE_ROOT) != 0)
+    {
+        fprintf(
+            stderr,
+            "[FAIL] MD01 unable to create module root: %s\n",
+            TEST_MODULE_ROOT
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    if (_mkdir(TEST_MARKDOWN_DIRECTORY) != 0)
+    {
+        fprintf(
+            stderr,
+            "[FAIL] MD01 unable to create Markdown directory: %s\n",
+            TEST_MARKDOWN_DIRECTORY
+        );
+
+        cleanup_markdown_fixture();
+
+        return EXIT_FAILURE;
+    }
+
+    if (write_test_file(
+        TEST_MARKDOWN_CONFIG,
+        "id=" RB_MARKDOWN_MODULE_ID "\n"
+    ) != EXIT_SUCCESS)
+    {
+        cleanup_markdown_fixture();
+
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+
+static rb_module_result_t rb_test_module_qualify(
+    rb_module_qualification_result_t* result
+)
+{
+    if (result == NULL)
+    {
+        return RB_MODULE_ERR_INVALID_ARGUMENT;
+    }
+
+    module_test_invocations++;
+
+    result->tests_executed = 10;
+    result->tests_passed = 10;
+    result->tests_failed = 0;
+
+    result->negative_test_executed = 1;
+    result->negative_test_passed = 1;
+
+    return RB_MODULE_OK;
+}
+
+
 static int test_q01_q04_lifecycle(void)
 {
     rb_core_t core = {
@@ -96,12 +316,16 @@ static int test_q01_q04_lifecycle(void)
     rb_config_t config = {
         ".",
         ".",
-        "INFO"
+        "INFO",
+        "."
     };
 
     rb_result_t result;
 
-    result = rb_core_init(&core, &config);
+    result = rb_core_init(
+        &core,
+        &config
+    );
 
     if (result != RB_OK)
     {
@@ -133,7 +357,9 @@ static int test_q01_q04_lifecycle(void)
         "[PASS] Q02 core reached READY after initialization\n"
     );
 
-    result = rb_core_run(&core);
+    result = rb_core_run(
+        &core
+    );
 
     if (result != RB_OK)
     {
@@ -161,7 +387,9 @@ static int test_q01_q04_lifecycle(void)
         "[PASS] Q03 core transitioned READY -> RUNNING\n"
     );
 
-    result = rb_core_shutdown(&core);
+    result = rb_core_shutdown(
+        &core
+    );
 
     if (result != RB_OK)
     {
@@ -202,7 +430,9 @@ static int test_q05_invalid_transition(void)
 
     rb_result_t result;
 
-    result = rb_core_run(&core);
+    result = rb_core_run(
+        &core
+    );
 
     if (result != RB_ERR_INVALID_STATE)
     {
@@ -249,6 +479,7 @@ static int test_q06_valid_config(void)
         TEST_CONFIG_VALID,
         "source_path=.\n"
         "output_path=.\n"
+        "modules_path=.\n"
         "log_level=INFO\n"
     ) != EXIT_SUCCESS)
     {
@@ -262,7 +493,9 @@ static int test_q06_valid_config(void)
 
     if (result != RB_CONFIG_OK)
     {
-        remove_test_file(TEST_CONFIG_VALID);
+        remove_test_file(
+            TEST_CONFIG_VALID
+        );
 
         fprintf(
             stderr,
@@ -273,9 +506,13 @@ static int test_q06_valid_config(void)
         return EXIT_FAILURE;
     }
 
-    result = rb_config_validate(&config);
+    result = rb_config_validate(
+        &config
+    );
 
-    remove_test_file(TEST_CONFIG_VALID);
+    remove_test_file(
+        TEST_CONFIG_VALID
+    );
 
     if (result != RB_CONFIG_OK)
     {
@@ -301,7 +538,9 @@ static int test_q07_missing_config(void)
     rb_config_t config;
     rb_config_result_t result;
 
-    remove_test_file(TEST_CONFIG_MISSING);
+    remove_test_file(
+        TEST_CONFIG_MISSING
+    );
 
     result = rb_config_load(
         TEST_CONFIG_MISSING,
@@ -346,7 +585,9 @@ static int test_q08_missing_required_field(void)
         &config
     );
 
-    remove_test_file(TEST_CONFIG_NO_FIELD);
+    remove_test_file(
+        TEST_CONFIG_NO_FIELD
+    );
 
     if (result != RB_CONFIG_ERR_MISSING_FIELD)
     {
@@ -376,6 +617,7 @@ static int test_q09_unknown_key(void)
         TEST_CONFIG_UNKNOWN,
         "source_path=.\n"
         "output_path=.\n"
+        "modules_path=.\n"
         "log_level=INFO\n"
         "banana=YES\n"
     ) != EXIT_SUCCESS)
@@ -388,7 +630,9 @@ static int test_q09_unknown_key(void)
         &config
     );
 
-    remove_test_file(TEST_CONFIG_UNKNOWN);
+    remove_test_file(
+        TEST_CONFIG_UNKNOWN
+    );
 
     if (result != RB_CONFIG_ERR_INVALID_FORMAT)
     {
@@ -418,6 +662,7 @@ static int test_q10_duplicate_key(void)
         TEST_CONFIG_DUPLICATE,
         "source_path=.\n"
         "output_path=.\n"
+        "modules_path=.\n"
         "log_level=INFO\n"
         "log_level=INFO\n"
     ) != EXIT_SUCCESS)
@@ -430,7 +675,9 @@ static int test_q10_duplicate_key(void)
         &config
     );
 
-    remove_test_file(TEST_CONFIG_DUPLICATE);
+    remove_test_file(
+        TEST_CONFIG_DUPLICATE
+    );
 
     if (result != RB_CONFIG_ERR_INVALID_FORMAT)
     {
@@ -460,6 +707,7 @@ static int test_q11_overlength_value(void)
         TEST_CONFIG_OVERLENGTH,
         "source_path=.\n"
         "output_path=.\n"
+        "modules_path=.\n"
         "log_level=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n"
     ) != EXIT_SUCCESS)
     {
@@ -471,7 +719,9 @@ static int test_q11_overlength_value(void)
         &config
     );
 
-    remove_test_file(TEST_CONFIG_OVERLENGTH);
+    remove_test_file(
+        TEST_CONFIG_OVERLENGTH
+    );
 
     if (result != RB_CONFIG_ERR_VALUE_TOO_LONG)
     {
@@ -501,6 +751,7 @@ static int test_q12_unsupported_log_level(void)
         TEST_CONFIG_BAD_LEVEL,
         "source_path=.\n"
         "output_path=.\n"
+        "modules_path=.\n"
         "log_level=CHAOS\n"
     ) != EXIT_SUCCESS)
     {
@@ -514,7 +765,9 @@ static int test_q12_unsupported_log_level(void)
 
     if (result != RB_CONFIG_OK)
     {
-        remove_test_file(TEST_CONFIG_BAD_LEVEL);
+        remove_test_file(
+            TEST_CONFIG_BAD_LEVEL
+        );
 
         fprintf(
             stderr,
@@ -525,9 +778,13 @@ static int test_q12_unsupported_log_level(void)
         return EXIT_FAILURE;
     }
 
-    result = rb_config_validate(&config);
+    result = rb_config_validate(
+        &config
+    );
 
-    remove_test_file(TEST_CONFIG_BAD_LEVEL);
+    remove_test_file(
+        TEST_CONFIG_BAD_LEVEL
+    );
 
     if (result != RB_CONFIG_ERR_INVALID_FORMAT)
     {
@@ -552,7 +809,10 @@ static int test_q13_valid_source(void)
 {
     rb_platform_result_t result;
 
-    result = rb_platform_validate_readable_directory(".");
+    result =
+        rb_platform_validate_readable_directory(
+            "."
+        );
 
     if (result != RB_PLATFORM_OK)
     {
@@ -577,9 +837,10 @@ static int test_q14_missing_source(void)
 {
     rb_platform_result_t result;
 
-    result = rb_platform_validate_readable_directory(
-        "rb_test_source_does_not_exist"
-    );
+    result =
+        rb_platform_validate_readable_directory(
+            "rb_test_source_does_not_exist"
+        );
 
     if (result != RB_PLATFORM_ERR_NOT_FOUND)
     {
@@ -616,9 +877,10 @@ static int test_q15_unreadable_source(void)
         return EXIT_FAILURE;
     }
 
-    result = rb_platform_validate_readable_directory(
-        TEST_SOURCE_UNREADABLE
-    );
+    result =
+        rb_platform_validate_readable_directory(
+            TEST_SOURCE_UNREADABLE
+        );
 
     if (!rb_test_acl_cleanup_directory(
         TEST_SOURCE_UNREADABLE
@@ -655,7 +917,10 @@ static int test_q16_valid_output(void)
 {
     rb_platform_result_t result;
 
-    result = rb_platform_validate_writable_directory(".");
+    result =
+        rb_platform_validate_writable_directory(
+            "."
+        );
 
     if (result != RB_PLATFORM_OK)
     {
@@ -680,9 +945,10 @@ static int test_q17_missing_output(void)
 {
     rb_platform_result_t result;
 
-    result = rb_platform_validate_writable_directory(
-        "rb_test_output_does_not_exist"
-    );
+    result =
+        rb_platform_validate_writable_directory(
+            "rb_test_output_does_not_exist"
+        );
 
     if (result != RB_PLATFORM_ERR_NOT_FOUND)
     {
@@ -719,9 +985,10 @@ static int test_q18_unwritable_output(void)
         return EXIT_FAILURE;
     }
 
-    result = rb_platform_validate_writable_directory(
-        TEST_OUTPUT_UNWRITABLE
-    );
+    result =
+        rb_platform_validate_writable_directory(
+            TEST_OUTPUT_UNWRITABLE
+        );
 
     if (!rb_test_acl_cleanup_directory(
         TEST_OUTPUT_UNWRITABLE
@@ -764,12 +1031,16 @@ static int test_q19_environment_failure(void)
     rb_config_t config = {
         "rb_test_source_does_not_exist",
         ".",
-        "INFO"
+        "INFO",
+        "."
     };
 
     rb_result_t result;
 
-    result = rb_core_init(&core, &config);
+    result = rb_core_init(
+        &core,
+        &config
+    );
 
     if (result != RB_ERR_ENVIRONMENT)
     {
@@ -815,12 +1086,16 @@ static int test_q20_complete_lifecycle(void)
     rb_config_t config = {
         ".",
         ".",
-        "INFO"
+        "INFO",
+        "."
     };
 
     rb_result_t result;
 
-    result = rb_core_init(&core, &config);
+    result = rb_core_init(
+        &core,
+        &config
+    );
 
     if (result != RB_OK)
     {
@@ -833,7 +1108,9 @@ static int test_q20_complete_lifecycle(void)
         return EXIT_FAILURE;
     }
 
-    result = rb_core_run(&core);
+    result = rb_core_run(
+        &core
+    );
 
     if (result != RB_OK)
     {
@@ -846,7 +1123,9 @@ static int test_q20_complete_lifecycle(void)
         return EXIT_FAILURE;
     }
 
-    result = rb_core_shutdown(&core);
+    result = rb_core_shutdown(
+        &core
+    );
 
     if (result != RB_OK)
     {
@@ -872,6 +1151,775 @@ static int test_q20_complete_lifecycle(void)
 
     printf(
         "[PASS] Q20 complete lifecycle exited cleanly\n"
+    );
+
+    return EXIT_SUCCESS;
+}
+
+
+static int test_mg01_new_module_qualification(void)
+{
+    rb_core_t core = {
+        RB_CORE_STATE_UNINITIALIZED,
+        RB_OK
+    };
+
+    rb_config_t config = {
+        ".",
+        ".",
+        "INFO",
+        TEST_MODULE_ROOT
+    };
+
+    rb_module_descriptor_t descriptor = {
+        TEST_MODULE_ID,
+        TEST_MODULE_NAME,
+
+        0,
+        1,
+        0,
+
+        RB_MODULE_API_MAJOR,
+        RB_MODULE_API_MINOR,
+
+        rb_test_module_qualify
+    };
+
+    const rb_module_record_t* record;
+
+    rb_result_t core_result;
+    rb_module_result_t module_result;
+
+    module_test_invocations = 0;
+
+    if (create_module_fixture() != EXIT_SUCCESS)
+    {
+        return EXIT_FAILURE;
+    }
+
+    core_result = rb_core_init(
+        &core,
+        &config
+    );
+
+    if (core_result != RB_OK)
+    {
+        cleanup_module_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MG01 Core initialization failed: %s\n",
+            rb_result_string(core_result)
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    module_result =
+        rb_module_catalog_register(
+            &core.module_catalog,
+            &descriptor
+        );
+
+    if (module_result != RB_MODULE_OK)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_module_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MG01 test implementation registration failed: %s\n",
+            rb_module_result_string(module_result)
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    core_result = rb_core_run(
+        &core
+    );
+
+    if (core_result != RB_OK)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_module_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MG01 Core execution failed: %s\n",
+            rb_result_string(core_result)
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    record = rb_module_registry_find(
+        &core.module_registry,
+        TEST_MODULE_ID
+    );
+
+    if (record == NULL)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_module_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MG01 Core did not discover filesystem module\n"
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] MG01 Core discovered new module from modules directory\n"
+    );
+
+    if (record->state !=
+        RB_MODULE_STATE_QUALIFIED)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_module_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MG01 module did not reach QUALIFIED: %s\n",
+            rb_module_state_string(record->state)
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] MG01 Core verified module compatibility\n"
+    );
+
+    if (module_test_invocations != 1)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_module_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MG01 module bench invocation count: %u\n",
+            module_test_invocations
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] MG01 Core invoked module qualification suite\n"
+    );
+
+    if (record->qualification.tests_executed != 10 ||
+        record->qualification.tests_passed != 10 ||
+        record->qualification.tests_failed != 0)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_module_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MG01 invalid module test evidence\n"
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] MG01 module reported 10/10 tests\n"
+    );
+
+    if (!record->qualification.negative_test_executed ||
+        !record->qualification.negative_test_passed)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_module_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MG01 negative validation evidence missing or failed\n"
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] MG01 module negative validation: PASS\n"
+    );
+
+    printf(
+        "[PASS] MG01 Core recorded module state: QUALIFIED\n"
+    );
+
+    if (core.module_registry.audit_count == 0)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_module_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MG01 qualification produced no audit evidence\n"
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] MG01 Core preserved module audit evidence\n"
+    );
+
+    core_result = rb_core_shutdown(
+        &core
+    );
+
+    cleanup_module_fixture();
+
+    if (core_result != RB_OK)
+    {
+        fprintf(
+            stderr,
+            "[FAIL] MG01 Core shutdown failed: %s\n",
+            rb_result_string(core_result)
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+
+static int test_lg01_core_logging(void)
+{
+    rb_core_t core = {
+        RB_CORE_STATE_UNINITIALIZED,
+        RB_OK
+    };
+
+    rb_config_t config = {
+        ".",
+        ".",
+        "INFO",
+        "."
+    };
+
+    rb_result_t core_result;
+    rb_log_result_t log_result;
+
+    remove_test_file(
+        TEST_LOG_FILE
+    );
+
+    core_result = rb_core_init(
+        &core,
+        &config
+    );
+
+    if (core_result != RB_OK)
+    {
+        fprintf(
+            stderr,
+            "[FAIL] LG01 Core initialization failed: %s\n",
+            rb_result_string(core_result)
+        );
+
+        remove_test_file(
+            TEST_LOG_FILE
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    if (!core.log.initialized)
+    {
+        fprintf(
+            stderr,
+            "[FAIL] LG01 logger not initialized by Core\n"
+        );
+
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        remove_test_file(
+            TEST_LOG_FILE
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] LG01 Core initialized logging\n"
+    );
+
+    log_result = rb_log_write(
+        &core.log,
+        RB_LOG_INFO,
+        "LG01",
+        TEST_LOG_INFO_MARKER
+    );
+
+    if (log_result != RB_LOG_OK)
+    {
+        fprintf(
+            stderr,
+            "[FAIL] LG01 INFO write failed: %s\n",
+            rb_log_result_string(log_result)
+        );
+
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        remove_test_file(
+            TEST_LOG_FILE
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    log_result = rb_log_write(
+        &core.log,
+        RB_LOG_DEBUG,
+        "LG01",
+        TEST_LOG_DEBUG_MARKER
+    );
+
+    if (log_result != RB_LOG_OK)
+    {
+        fprintf(
+            stderr,
+            "[FAIL] LG01 DEBUG filtering returned error: %s\n",
+            rb_log_result_string(log_result)
+        );
+
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        remove_test_file(
+            TEST_LOG_FILE
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    core_result = rb_core_shutdown(
+        &core
+    );
+
+    if (core_result != RB_OK)
+    {
+        fprintf(
+            stderr,
+            "[FAIL] LG01 Core shutdown failed: %s\n",
+            rb_result_string(core_result)
+        );
+
+        remove_test_file(
+            TEST_LOG_FILE
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    if (core.log.initialized)
+    {
+        fprintf(
+            stderr,
+            "[FAIL] LG01 logger remained initialized after Core shutdown\n"
+        );
+
+        remove_test_file(
+            TEST_LOG_FILE
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] LG01 Core closed logging during shutdown\n"
+    );
+
+    if (!file_contains_text(
+        TEST_LOG_FILE,
+        TEST_LOG_INFO_MARKER
+    ))
+    {
+        fprintf(
+            stderr,
+            "[FAIL] LG01 INFO event not found in log\n"
+        );
+
+        remove_test_file(
+            TEST_LOG_FILE
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] LG01 INFO event preserved in log\n"
+    );
+
+    if (file_contains_text(
+        TEST_LOG_FILE,
+        TEST_LOG_DEBUG_MARKER
+    ))
+    {
+        fprintf(
+            stderr,
+            "[FAIL] LG01 DEBUG event bypassed INFO level filter\n"
+        );
+
+        remove_test_file(
+            TEST_LOG_FILE
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] LG01 log-level filtering enforced\n"
+    );
+
+    if (!file_contains_text(
+        TEST_LOG_FILE,
+        "CORE READY"
+    ))
+    {
+        fprintf(
+            stderr,
+            "[FAIL] LG01 Core READY event missing from log\n"
+        );
+
+        remove_test_file(
+            TEST_LOG_FILE
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    if (!file_contains_text(
+        TEST_LOG_FILE,
+        "CORE STOPPED"
+    ))
+    {
+        fprintf(
+            stderr,
+            "[FAIL] LG01 Core STOPPED event missing from log\n"
+        );
+
+        remove_test_file(
+            TEST_LOG_FILE
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] LG01 Core lifecycle evidence preserved\n"
+    );
+
+    remove_test_file(
+        TEST_LOG_FILE
+    );
+
+    printf(
+        "[PASS] LG01 logging qualification complete\n"
+    );
+
+    return EXIT_SUCCESS;
+}
+
+
+static int test_md01_markdown_module(void)
+{
+    rb_core_t core = {
+        RB_CORE_STATE_UNINITIALIZED,
+        RB_OK
+    };
+
+    rb_config_t config = {
+        ".",
+        ".",
+        "INFO",
+        TEST_MODULE_ROOT
+    };
+
+    const rb_module_record_t* record;
+
+    rb_result_t core_result;
+
+    if (create_markdown_fixture() != EXIT_SUCCESS)
+    {
+        return EXIT_FAILURE;
+    }
+
+    /*
+     * rb_core_init() registers the compiled Markdown
+     * implementation in the Core-owned static catalog.
+     *
+     * The filesystem declaration remains the discovery
+     * boundary.
+     */
+    core_result = rb_core_init(
+        &core,
+        &config
+    );
+
+    if (core_result != RB_OK)
+    {
+        cleanup_markdown_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MD01 Core initialization failed: %s\n",
+            rb_result_string(core_result)
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    /*
+     * Core scans TEST_MODULE_ROOT, encounters the
+     * RB-MARKDOWN declaration, resolves the statically
+     * compiled descriptor, and starts qualification.
+     */
+    core_result = rb_core_run(
+        &core
+    );
+
+    if (core_result != RB_OK)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_markdown_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MD01 Core execution failed: %s\n",
+            rb_result_string(core_result)
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    record = rb_module_registry_find(
+        &core.module_registry,
+        RB_MARKDOWN_MODULE_ID
+    );
+
+    if (record == NULL)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_markdown_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MD01 Core did not discover RB-MARKDOWN\n"
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] MD01 Core discovered RB-MARKDOWN from modules directory\n"
+    );
+
+    if (record->state !=
+        RB_MODULE_STATE_QUALIFIED)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_markdown_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MD01 expected QUALIFIED, received: %s\n",
+            rb_module_state_string(record->state)
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] MD01 Markdown module state: QUALIFIED\n"
+    );
+
+    if (record->qualification.tests_executed != 10 ||
+        record->qualification.tests_passed != 10 ||
+        record->qualification.tests_failed != 0)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_markdown_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MD01 Markdown qualification result: %u/%u, failed=%u\n",
+            record->qualification.tests_passed,
+            record->qualification.tests_executed,
+            record->qualification.tests_failed
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] MD01 Markdown qualification: 10/10\n"
+    );
+
+    if (!record->qualification.negative_test_executed)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_markdown_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MD01 negative validation was not executed\n"
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    if (!record->qualification.negative_test_passed)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_markdown_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MD01 negative validation failed\n"
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] MD01 Markdown negative validation: PASS\n"
+    );
+
+    /*
+     * Qualification does not imply activation.
+     */
+    if (record->activation_authorized)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_markdown_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MD01 Markdown received activation authorization unexpectedly\n"
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    if (record->state ==
+        RB_MODULE_STATE_ACTIVE)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_markdown_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MD01 Markdown activated without authorization\n"
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] MD01 qualification did not grant activation authority\n"
+    );
+
+    if (core.module_registry.audit_count == 0)
+    {
+        (void)rb_core_shutdown(
+            &core
+        );
+
+        cleanup_markdown_fixture();
+
+        fprintf(
+            stderr,
+            "[FAIL] MD01 no module audit evidence recorded\n"
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] MD01 Core preserved Markdown qualification evidence\n"
+    );
+
+    core_result = rb_core_shutdown(
+        &core
+    );
+
+    cleanup_markdown_fixture();
+
+    if (core_result != RB_OK)
+    {
+        fprintf(
+            stderr,
+            "[FAIL] MD01 Core shutdown failed: %s\n",
+            rb_result_string(core_result)
+        );
+
+        return EXIT_FAILURE;
+    }
+
+    printf(
+        "[PASS] MD01 Markdown module qualification complete\n"
     );
 
     return EXIT_SUCCESS;
@@ -975,6 +2023,21 @@ int main(void)
         failures++;
     }
 
+    if (test_mg01_new_module_qualification() != EXIT_SUCCESS)
+    {
+        failures++;
+    }
+
+    if (test_lg01_core_logging() != EXIT_SUCCESS)
+    {
+        failures++;
+    }
+
+    if (test_md01_markdown_module() != EXIT_SUCCESS)
+    {
+        failures++;
+    }
+
     printf(
         "------------------------------------\n"
     );
@@ -990,7 +2053,7 @@ int main(void)
     }
 
     printf(
-        "[RESULT] PASS - Q01 through Q20\n"
+        "[RESULT] PASS - Q01 through Q20 + MG01 + LG01 + MD01\n"
     );
 
     return EXIT_SUCCESS;

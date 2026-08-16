@@ -1,5 +1,11 @@
+C:\Users\Poe\Documents\GitHub\rag_builder\modules\markdown\src\markdown.c;C:\Users\Poe\Documents\GitHub\rag_builder\rag_builder_test\rag_builder_test\x64\Debug\markdown.obj
 C:\Users\Poe\Documents\GitHub\rag_builder\src\config.c;C:\Users\Poe\Documents\GitHub\rag_builder\rag_builder_test\rag_builder_test\x64\Debug\config.obj
 C:\Users\Poe\Documents\GitHub\rag_builder\src\core.c;C:\Users\Poe\Documents\GitHub\rag_builder\rag_builder_test\rag_builder_test\x64\Debug\core.obj
+C:\Users\Poe\Documents\GitHub\rag_builder\src\log.c;C:\Users\Poe\Documents\GitHub\rag_builder\rag_builder_test\rag_builder_test\x64\Debug\log.obj
+C:\Users\Poe\Documents\GitHub\rag_builder\src\module.c;C:\Users\Poe\Documents\GitHub\rag_builder\rag_builder_test\rag_builder_test\x64\Debug\module.obj
+C:\Users\Poe\Documents\GitHub\rag_builder\src\module_catalog.c;C:\Users\Poe\Documents\GitHub\rag_builder\rag_builder_test\rag_builder_test\x64\Debug\module_catalog.obj
+C:\Users\Poe\Documents\GitHub\rag_builder\src\module_discovery_win.c;C:\Users\Poe\Documents\GitHub\rag_builder\rag_builder_test\rag_builder_test\x64\Debug\module_discovery_win.obj
+C:\Users\Poe\Documents\GitHub\rag_builder\src\module_registry.c;C:\Users\Poe\Documents\GitHub\rag_builder\rag_builder_test\rag_builder_test\x64\Debug\module_registry.obj
 C:\Users\Poe\Documents\GitHub\rag_builder\src\platform_win.c;C:\Users\Poe\Documents\GitHub\rag_builder\rag_builder_test\rag_builder_test\x64\Debug\platform_win.obj
 C:\Users\Poe\Documents\GitHub\rag_builder\tests\acl_fixture_win.c;C:\Users\Poe\Documents\GitHub\rag_builder\rag_builder_test\rag_builder_test\x64\Debug\acl_fixture_win.obj
 C:\Users\Poe\Documents\GitHub\rag_builder\tests\core_state_test.c;C:\Users\Poe\Documents\GitHub\rag_builder\rag_builder_test\rag_builder_test\x64\Debug\core_state_test.obj

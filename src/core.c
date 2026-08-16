@@ -96,6 +96,11 @@ rb_result_t rb_core_init(
         core->state = RB_CORE_STATE_FAILED;
         core->last_result = result;
 
+        printf(
+            "[CORE] State: %s\n",
+            rb_core_state_string(core->state)
+        );
+
         return result;
     }
 

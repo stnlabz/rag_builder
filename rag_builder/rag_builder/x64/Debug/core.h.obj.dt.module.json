@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "rag_builder\\x64\\Debug\\core.obj",
+            "outputs": [
+                "rag_builder\\x64\\Debug\\core.h.obj.dt.module.json",
+                "rag_builder\\x64\\Debug\\core.h.obj.dt.d.json"
+            ],
+            "requires": []
+        }
+    ]
+}

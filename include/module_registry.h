@@ -18,6 +18,7 @@ typedef enum
     RB_MODULE_AUDIT_AUTHORIZED,
     RB_MODULE_AUDIT_ACTIVE,
     RB_MODULE_AUDIT_QUARANTINED
+
 } rb_module_audit_event_t;
 
 typedef struct
@@ -29,6 +30,7 @@ typedef struct
     rb_module_qualification_result_t qualification;
 
     int activation_authorized;
+
 } rb_module_record_t;
 
 typedef struct
@@ -43,17 +45,23 @@ typedef struct
     rb_module_state_t resulting_state;
 
     rb_module_result_t result;
+
 } rb_module_audit_entry_t;
 
 typedef struct
 {
-    rb_module_record_t modules[RB_MODULE_REGISTRY_MAX];
+    rb_module_record_t
+        modules[RB_MODULE_REGISTRY_MAX];
+
     size_t count;
 
-    rb_module_audit_entry_t audit[RB_MODULE_AUDIT_MAX];
+    rb_module_audit_entry_t
+        audit[RB_MODULE_AUDIT_MAX];
+
     size_t audit_count;
 
     unsigned long next_sequence;
+
 } rb_module_registry_t;
 
 void rb_module_registry_init(
@@ -73,6 +81,12 @@ rb_module_result_t rb_module_registry_verify(
 rb_module_result_t rb_module_registry_qualify(
     rb_module_registry_t* registry,
     const char* module_id
+);
+
+rb_module_result_t rb_module_registry_restore_qualification(
+    rb_module_registry_t* registry,
+    const char* module_id,
+    const rb_module_qualification_result_t* qualification
 );
 
 rb_module_result_t rb_module_registry_authorize_activation(

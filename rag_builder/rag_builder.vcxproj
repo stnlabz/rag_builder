@@ -145,6 +145,7 @@
     <ClInclude Include="..\include\log.h" />
     <ClInclude Include="..\include\module.h" />
     <ClInclude Include="..\include\module_catalog.h" />
+    <ClInclude Include="..\include\module_inventory.h" />
     <ClInclude Include="..\include\module_registry.h" />
     <ClInclude Include="..\include\platform.h" />
     <ClInclude Include="..\include\version.h" />
@@ -159,6 +160,7 @@
     <ClCompile Include="..\src\module.c" />
     <ClCompile Include="..\src\module_catalog.c" />
     <ClCompile Include="..\src\module_discovery_win.c" />
+    <ClCompile Include="..\src\module_inventory.c" />
     <ClCompile Include="..\src\module_registry.c" />
     <ClCompile Include="..\src\platform_win.c" />
   </ItemGroup>

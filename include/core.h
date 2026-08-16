@@ -4,6 +4,7 @@
 #include "config.h"
 #include "log.h"
 #include "module_catalog.h"
+#include "module_inventory.h"
 #include "module_registry.h"
 
 typedef enum
@@ -15,6 +16,7 @@ typedef enum
     RB_CORE_STATE_STOPPING,
     RB_CORE_STATE_STOPPED,
     RB_CORE_STATE_FAILED
+
 } rb_core_state_t;
 
 typedef enum
@@ -27,6 +29,7 @@ typedef enum
     RB_ERR_LOGGING,
     RB_ERR_RUNTIME,
     RB_ERR_SHUTDOWN
+
 } rb_result_t;
 
 typedef struct
@@ -40,6 +43,8 @@ typedef struct
 
     rb_module_catalog_t module_catalog;
     rb_module_registry_t module_registry;
+    rb_module_inventory_t module_inventory;
+
 } rb_core_t;
 
 rb_result_t rb_core_init(

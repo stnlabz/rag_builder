@@ -42,6 +42,9 @@
     <ClInclude Include="..\modules\markdown\include\markdown.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\module_inventory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\core.c">
@@ -72,6 +75,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\modules\markdown\src\markdown.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\module_inventory.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

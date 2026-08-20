@@ -1,6 +1,8 @@
 #include <string.h>
+#include <windows.h>
 
 #include "module_registry.h"
+
 
 static int rb_module_text_valid(
     const char* text,
@@ -9,46 +11,50 @@ static int rb_module_text_valid(
 {
     size_t length;
 
-    if (text == NULL || capacity == 0)
+    if (text == NULL ||
+        capacity == 0)
     {
         return 0;
     }
 
-    length = strlen(text);
+    length =
+        strlen(text);
 
-    if (length == 0 || length >= capacity)
-    {
-        return 0;
-    }
-
-    return 1;
+    return length > 0 &&
+        length < capacity;
 }
 
-static rb_module_record_t* rb_module_registry_find_mutable(
+
+static rb_module_record_t*
+rb_module_registry_find_mutable(
     rb_module_registry_t* registry,
     const char* module_id
 )
 {
-    size_t index;
+    size_t i;
 
-    if (registry == NULL || module_id == NULL)
+    if (registry == NULL ||
+        module_id == NULL)
     {
         return NULL;
     }
 
-    for (index = 0; index < registry->count; index++)
+    for (i = 0;
+        i < registry->count;
+        i++)
     {
         if (strcmp(
-            registry->modules[index].descriptor.id,
+            registry->modules[i].descriptor.id,
             module_id
         ) == 0)
         {
-            return &registry->modules[index];
+            return &registry->modules[i];
         }
     }
 
     return NULL;
 }
+
 
 static rb_module_result_t rb_module_audit(
     rb_module_registry_t* registry,
@@ -61,17 +67,22 @@ static rb_module_result_t rb_module_audit(
     rb_module_audit_entry_t* entry;
     size_t length;
 
-    if (registry == NULL || module == NULL)
+    if (registry == NULL ||
+        module == NULL)
     {
         return RB_MODULE_ERR_INVALID_ARGUMENT;
     }
 
-    if (registry->audit_count >= RB_MODULE_AUDIT_MAX)
+    if (registry->audit_count >=
+        RB_MODULE_AUDIT_MAX)
     {
         return RB_MODULE_ERR_AUDIT_FULL;
     }
 
-    entry = &registry->audit[registry->audit_count];
+    entry =
+        &registry->audit[
+            registry->audit_count
+        ];
 
     memset(
         entry,
@@ -95,10 +106,14 @@ static rb_module_result_t rb_module_audit(
         result;
 
     length =
-        strlen(module->descriptor.id);
+        strlen(
+            module->descriptor.id
+        );
 
     if (length >=
-        sizeof(entry->module_id))
+        sizeof(
+            entry->module_id
+        ))
     {
         return RB_MODULE_ERR_INVALID_IDENTITY;
     }
@@ -113,6 +128,7 @@ static rb_module_result_t rb_module_audit(
 
     return RB_MODULE_OK;
 }
+
 
 void rb_module_registry_init(
     rb_module_registry_t* registry
@@ -129,23 +145,37 @@ void rb_module_registry_init(
         sizeof(*registry)
     );
 
-    registry->next_sequence = 1;
+    registry->next_sequence =
+        1;
 }
+
 
 rb_module_result_t rb_module_registry_discover(
     rb_module_registry_t* registry,
-    const rb_module_descriptor_t* descriptor
+    const rb_module_descriptor_t* descriptor,
+    void* library_handle,
+    const char* binary_path,
+    const char* binary_sha256
 )
 {
     rb_module_record_t* record;
+
     rb_module_result_t audit_result;
 
     if (registry == NULL ||
-        descriptor == NULL)
+        descriptor == NULL ||
+        library_handle == NULL ||
+        binary_path == NULL ||
+        binary_sha256 == NULL)
     {
         return RB_MODULE_ERR_INVALID_ARGUMENT;
     }
 
+    /*
+     * Descriptor identity validation.
+     *
+     * execution_stage 0 is reserved as invalid.
+     */
     if (!rb_module_text_valid(
             descriptor->id,
             sizeof(descriptor->id)
@@ -154,15 +184,24 @@ rb_module_result_t rb_module_registry_discover(
             descriptor->name,
             sizeof(descriptor->name)
         ) ||
-        descriptor->qualify == NULL)
+        descriptor->execution_stage == 0 ||
+        descriptor->qualify == NULL ||
+        descriptor->execute == NULL)
+    {
+        return RB_MODULE_ERR_INVALID_IDENTITY;
+    }
+
+    if (strlen(binary_path) >=
+            RB_MODULE_PATH_MAX ||
+        strlen(binary_sha256) != 64)
     {
         return RB_MODULE_ERR_INVALID_IDENTITY;
     }
 
     if (rb_module_registry_find_mutable(
-            registry,
-            descriptor->id
-        ) != NULL)
+        registry,
+        descriptor->id
+    ) != NULL)
     {
         return RB_MODULE_ERR_DUPLICATE;
     }
@@ -187,11 +226,23 @@ rb_module_result_t rb_module_registry_discover(
     record->descriptor =
         *descriptor;
 
+    record->library_handle =
+        library_handle;
+
+    strcpy_s(
+        record->binary_path,
+        sizeof(record->binary_path),
+        binary_path
+    );
+
+    strcpy_s(
+        record->binary_sha256,
+        sizeof(record->binary_sha256),
+        binary_sha256
+    );
+
     record->state =
         RB_MODULE_STATE_DISCOVERED;
-
-    record->activation_authorized =
-        0;
 
     audit_result =
         rb_module_audit(
@@ -202,7 +253,8 @@ rb_module_result_t rb_module_registry_discover(
             RB_MODULE_OK
         );
 
-    if (audit_result != RB_MODULE_OK)
+    if (audit_result !=
+        RB_MODULE_OK)
     {
         memset(
             record,
@@ -218,13 +270,16 @@ rb_module_result_t rb_module_registry_discover(
     return RB_MODULE_OK;
 }
 
+
 rb_module_result_t rb_module_registry_verify(
     rb_module_registry_t* registry,
     const char* module_id
 )
 {
     rb_module_record_t* record;
+
     rb_module_state_t previous;
+
     rb_module_result_t audit_result;
 
     record =
@@ -253,6 +308,13 @@ rb_module_result_t rb_module_registry_verify(
     previous =
         record->state;
 
+    /*
+     * Major API version must match exactly.
+     *
+     * Modules may require an API minor version
+     * less than or equal to the Core-supported
+     * minor version.
+     */
     if (record->descriptor.required_core_api_major !=
             RB_MODULE_API_MAJOR ||
         record->descriptor.required_core_api_minor >
@@ -272,6 +334,25 @@ rb_module_result_t rb_module_registry_verify(
         return RB_MODULE_ERR_INCOMPATIBLE;
     }
 
+    /*
+     * Stage zero is never executable.
+     */
+    if (record->descriptor.execution_stage == 0)
+    {
+        record->state =
+            RB_MODULE_STATE_FAILED;
+
+        (void)rb_module_audit(
+            registry,
+            record,
+            RB_MODULE_AUDIT_FAILED,
+            previous,
+            RB_MODULE_ERR_INVALID_IDENTITY
+        );
+
+        return RB_MODULE_ERR_INVALID_IDENTITY;
+    }
+
     record->state =
         RB_MODULE_STATE_UNVERIFIED;
 
@@ -284,16 +365,16 @@ rb_module_result_t rb_module_registry_verify(
             RB_MODULE_OK
         );
 
-    if (audit_result != RB_MODULE_OK)
+    if (audit_result !=
+        RB_MODULE_OK)
     {
         record->state =
             previous;
-
-        return audit_result;
     }
 
-    return RB_MODULE_OK;
+    return audit_result;
 }
+
 
 rb_module_result_t rb_module_registry_qualify(
     rb_module_registry_t* registry,
@@ -301,9 +382,12 @@ rb_module_result_t rb_module_registry_qualify(
 )
 {
     rb_module_record_t* record;
+
     rb_module_state_t previous;
+
     rb_module_result_t module_result;
     rb_module_result_t audit_result;
+
     rb_module_qualification_result_t report;
 
     record =
@@ -344,7 +428,8 @@ rb_module_result_t rb_module_registry_qualify(
             RB_MODULE_OK
         );
 
-    if (audit_result != RB_MODULE_OK)
+    if (audit_result !=
+        RB_MODULE_OK)
     {
         record->state =
             previous;
@@ -358,10 +443,6 @@ rb_module_result_t rb_module_registry_qualify(
         sizeof(report)
     );
 
-    /*
-     * Core invokes the module's internal qualification suite.
-     * The module executes its tests and reports results back.
-     */
     module_result =
         record->descriptor.qualify(
             &report
@@ -373,7 +454,8 @@ rb_module_result_t rb_module_registry_qualify(
     previous =
         record->state;
 
-    if (module_result != RB_MODULE_OK ||
+    if (module_result !=
+            RB_MODULE_OK ||
         report.tests_executed <
             RB_MODULE_MIN_TESTS ||
         report.tests_passed !=
@@ -414,25 +496,28 @@ rb_module_result_t rb_module_registry_qualify(
             RB_MODULE_OK
         );
 
-    if (audit_result != RB_MODULE_OK)
+    if (audit_result !=
+        RB_MODULE_OK)
     {
         record->state =
             RB_MODULE_STATE_FAILED;
-
-        return audit_result;
     }
 
-    return RB_MODULE_OK;
+    return audit_result;
 }
 
-rb_module_result_t rb_module_registry_restore_qualification(
+
+rb_module_result_t
+rb_module_registry_restore_qualification(
     rb_module_registry_t* registry,
     const char* module_id,
     const rb_module_qualification_result_t* qualification
 )
 {
     rb_module_record_t* record;
+
     rb_module_state_t previous;
+
     rb_module_result_t audit_result;
 
     if (registry == NULL ||
@@ -459,21 +544,12 @@ rb_module_result_t rb_module_registry_restore_qualification(
         return RB_MODULE_ERR_QUARANTINED;
     }
 
-    /*
-     * Persistent qualification may only be restored
-     * after normal identity/API verification.
-     */
     if (record->state !=
         RB_MODULE_STATE_UNVERIFIED)
     {
         return RB_MODULE_ERR_INVALID_STATE;
     }
 
-    /*
-     * Core never trusts persisted qualification evidence
-     * merely because it exists. It must still satisfy the
-     * same mandatory qualification requirements.
-     */
     if (qualification->tests_executed <
             RB_MODULE_MIN_TESTS ||
         qualification->tests_passed !=
@@ -494,10 +570,6 @@ rb_module_result_t rb_module_registry_restore_qualification(
     record->qualification =
         *qualification;
 
-    /*
-     * Qualification never restores activation authority.
-     * Authorization remains a separate Core-controlled gate.
-     */
     record->activation_authorized =
         0;
 
@@ -513,7 +585,8 @@ rb_module_result_t rb_module_registry_restore_qualification(
             RB_MODULE_OK
         );
 
-    if (audit_result != RB_MODULE_OK)
+    if (audit_result !=
+        RB_MODULE_OK)
     {
         record->state =
             previous;
@@ -521,22 +594,25 @@ rb_module_result_t rb_module_registry_restore_qualification(
         memset(
             &record->qualification,
             0,
-            sizeof(record->qualification)
+            sizeof(
+                record->qualification
+            )
         );
-
-        return audit_result;
     }
 
-    return RB_MODULE_OK;
+    return audit_result;
 }
 
-rb_module_result_t rb_module_registry_authorize_activation(
+
+rb_module_result_t
+rb_module_registry_authorize_activation(
     rb_module_registry_t* registry,
     const char* module_id
 )
 {
     rb_module_record_t* record;
-    rb_module_result_t audit_result;
+
+    rb_module_result_t result;
 
     record =
         rb_module_registry_find_mutable(
@@ -564,7 +640,7 @@ rb_module_result_t rb_module_registry_authorize_activation(
     record->activation_authorized =
         1;
 
-    audit_result =
+    result =
         rb_module_audit(
             registry,
             record,
@@ -573,16 +649,16 @@ rb_module_result_t rb_module_registry_authorize_activation(
             RB_MODULE_OK
         );
 
-    if (audit_result != RB_MODULE_OK)
+    if (result !=
+        RB_MODULE_OK)
     {
         record->activation_authorized =
             0;
-
-        return audit_result;
     }
 
-    return RB_MODULE_OK;
+    return result;
 }
+
 
 rb_module_result_t rb_module_registry_activate(
     rb_module_registry_t* registry,
@@ -590,8 +666,10 @@ rb_module_result_t rb_module_registry_activate(
 )
 {
     rb_module_record_t* record;
+
     rb_module_state_t previous;
-    rb_module_result_t audit_result;
+
+    rb_module_result_t result;
 
     record =
         rb_module_registry_find_mutable(
@@ -616,7 +694,8 @@ rb_module_result_t rb_module_registry_activate(
         return RB_MODULE_ERR_NOT_QUALIFIED;
     }
 
-    if (!record->activation_authorized)
+    if (!record->
+        activation_authorized)
     {
         return RB_MODULE_ERR_NOT_AUTHORIZED;
     }
@@ -627,7 +706,7 @@ rb_module_result_t rb_module_registry_activate(
     record->state =
         RB_MODULE_STATE_ACTIVE;
 
-    audit_result =
+    result =
         rb_module_audit(
             registry,
             record,
@@ -636,16 +715,16 @@ rb_module_result_t rb_module_registry_activate(
             RB_MODULE_OK
         );
 
-    if (audit_result != RB_MODULE_OK)
+    if (result !=
+        RB_MODULE_OK)
     {
         record->state =
             previous;
-
-        return audit_result;
     }
 
-    return RB_MODULE_OK;
+    return result;
 }
+
 
 rb_module_result_t rb_module_registry_fail(
     rb_module_registry_t* registry,
@@ -653,6 +732,7 @@ rb_module_result_t rb_module_registry_fail(
 )
 {
     rb_module_record_t* record;
+
     rb_module_state_t previous;
 
     record =
@@ -684,12 +764,15 @@ rb_module_result_t rb_module_registry_fail(
     );
 }
 
-rb_module_result_t rb_module_registry_quarantine(
+
+rb_module_result_t
+rb_module_registry_quarantine(
     rb_module_registry_t* registry,
     const char* module_id
 )
 {
     rb_module_record_t* record;
+
     rb_module_state_t previous;
 
     record =
@@ -721,12 +804,14 @@ rb_module_result_t rb_module_registry_quarantine(
     );
 }
 
-const rb_module_record_t* rb_module_registry_find(
+
+const rb_module_record_t*
+rb_module_registry_find(
     const rb_module_registry_t* registry,
     const char* module_id
 )
 {
-    size_t index;
+    size_t i;
 
     if (registry == NULL ||
         module_id == NULL)
@@ -734,18 +819,59 @@ const rb_module_record_t* rb_module_registry_find(
         return NULL;
     }
 
-    for (index = 0;
-         index < registry->count;
-         index++)
+    for (i = 0;
+        i < registry->count;
+        i++)
     {
         if (strcmp(
-            registry->modules[index].descriptor.id,
+            registry->modules[i].descriptor.id,
             module_id
         ) == 0)
         {
-            return &registry->modules[index];
+            return &registry->modules[i];
         }
     }
 
     return NULL;
+}
+
+
+void rb_module_registry_unload_all(
+    rb_module_registry_t* registry
+)
+{
+    size_t i;
+
+    if (registry == NULL)
+    {
+        return;
+    }
+
+    for (i = 0;
+        i < registry->count;
+        i++)
+    {
+        rb_module_record_t* record;
+
+        record =
+            &registry->modules[i];
+
+        if (record->library_handle !=
+            NULL)
+        {
+            if (record->descriptor.shutdown !=
+                NULL)
+            {
+                record->descriptor.shutdown();
+            }
+
+            FreeLibrary(
+                (HMODULE)
+                record->library_handle
+            );
+
+            record->library_handle =
+                NULL;
+        }
+    }
 }

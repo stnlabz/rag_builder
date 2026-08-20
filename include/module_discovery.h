@@ -2,8 +2,6 @@
 #define RAG_BUILDER_MODULE_DISCOVERY_H
 
 #include <stddef.h>
-
-#include "module_catalog.h"
 #include "module_registry.h"
 
 typedef struct
@@ -16,7 +14,6 @@ typedef struct
 
 rb_module_result_t rb_module_discovery_scan(
     rb_module_registry_t* registry,
-    const rb_module_catalog_t* catalog,
     const char* modules_path,
     rb_module_discovery_report_t* report
 );

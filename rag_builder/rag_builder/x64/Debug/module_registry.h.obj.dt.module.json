@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "rag_builder\\x64\\Debug\\module_registry.obj",
+            "outputs": [
+                "rag_builder\\x64\\Debug\\module_registry.h.obj.dt.module.json",
+                "rag_builder\\x64\\Debug\\module_registry.h.obj.dt.d.json"
+            ],
+            "requires": []
+        }
+    ]
+}

@@ -1,0 +1,30 @@
+#ifndef RAG_BUILDER_PROVENANCE_H
+#define RAG_BUILDER_PROVENANCE_H
+
+#include "module.h"
+
+#define RB_PROVENANCE_MODULE_ID       "RB-PROVENANCE"
+#define RB_PROVENANCE_MODULE_NAME     "Provenance"
+
+#define RB_PROVENANCE_VERSION_MAJOR   0
+#define RB_PROVENANCE_VERSION_MINOR   3
+#define RB_PROVENANCE_VERSION_PATCH   14
+
+#define RB_PROVENANCE_EXECUTION_STAGE 300
+
+#define RB_PROVENANCE_CORPUS_FORMAT         "STN-LABZ-RAG-CORPUS"
+#define RB_PROVENANCE_CORPUS_FORMAT_VERSION 1
+
+#define RB_PROVENANCE_SHA256_HEX      65
+#define RB_PROVENANCE_ID_MAX          128
+#define RB_PROVENANCE_STATUS_MAX      64
+#define RB_PROVENANCE_PATH_MAX        RB_MODULE_PATH_MAX
+
+
+#define RB_PROVENANCE_POLICY_INDEX_PATH \
+    "C:\\stn-labz\\policies\\policy.index.json"
+
+#define RB_PROVENANCE_POLICY_CHAINLOG_PATH \
+    "C:\\stn-labz\\policies\\policy.index.json.chainlog"
+
+#endif

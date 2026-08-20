@@ -144,21 +144,17 @@
     <ClInclude Include="..\include\core.h" />
     <ClInclude Include="..\include\log.h" />
     <ClInclude Include="..\include\module.h" />
-    <ClInclude Include="..\include\module_catalog.h" />
     <ClInclude Include="..\include\module_inventory.h" />
     <ClInclude Include="..\include\module_registry.h" />
     <ClInclude Include="..\include\platform.h" />
     <ClInclude Include="..\include\version.h" />
-    <ClInclude Include="..\modules\markdown\include\markdown.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\modules\markdown\src\markdown.c" />
     <ClCompile Include="..\src\config.c" />
     <ClCompile Include="..\src\core.c" />
     <ClCompile Include="..\src\log.c" />
     <ClCompile Include="..\src\main.c" />
     <ClCompile Include="..\src\module.c" />
-    <ClCompile Include="..\src\module_catalog.c" />
     <ClCompile Include="..\src\module_discovery_win.c" />
     <ClCompile Include="..\src\module_inventory.c" />
     <ClCompile Include="..\src\module_registry.c" />

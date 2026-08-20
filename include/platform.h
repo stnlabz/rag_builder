@@ -18,58 +18,26 @@ typedef enum
     RB_PLATFORM_ERR_OPEN_FAILED,
     RB_PLATFORM_ERR_READ_FAILED,
     RB_PLATFORM_ERR_BUFFER_TOO_SMALL,
-    RB_PLATFORM_ERR_NO_MORE_FILES
-
+    RB_PLATFORM_ERR_NO_MORE_FILES,
+    RB_PLATFORM_ERR_HASH_FAILED
 } rb_platform_result_t;
 
 typedef struct
 {
     void* handle;
-
     char directory[RB_PLATFORM_PATH_MAX];
     char pattern[RB_PLATFORM_PATH_MAX];
-
     int started;
-
 } rb_platform_file_iterator_t;
 
-rb_platform_result_t rb_platform_validate_directory(
-    const char* path
-);
-
-rb_platform_result_t rb_platform_validate_readable_directory(
-    const char* path
-);
-
-rb_platform_result_t rb_platform_validate_writable_directory(
-    const char* path
-);
-
-rb_platform_result_t rb_platform_file_iterator_open(
-    rb_platform_file_iterator_t* iterator,
-    const char* directory,
-    const char* pattern
-);
-
-rb_platform_result_t rb_platform_file_iterator_next(
-    rb_platform_file_iterator_t* iterator,
-    char* path,
-    size_t path_size
-);
-
-void rb_platform_file_iterator_close(
-    rb_platform_file_iterator_t* iterator
-);
-
-rb_platform_result_t rb_platform_read_file(
-    const char* path,
-    char* buffer,
-    size_t buffer_size,
-    size_t* bytes_read
-);
-
-const char* rb_platform_result_string(
-    rb_platform_result_t result
-);
+rb_platform_result_t rb_platform_validate_directory(const char* path);
+rb_platform_result_t rb_platform_validate_readable_directory(const char* path);
+rb_platform_result_t rb_platform_validate_writable_directory(const char* path);
+rb_platform_result_t rb_platform_file_iterator_open(rb_platform_file_iterator_t* iterator, const char* directory, const char* pattern);
+rb_platform_result_t rb_platform_file_iterator_next(rb_platform_file_iterator_t* iterator, char* path, size_t path_size);
+void rb_platform_file_iterator_close(rb_platform_file_iterator_t* iterator);
+rb_platform_result_t rb_platform_read_file(const char* path, char* buffer, size_t buffer_size, size_t* bytes_read);
+rb_platform_result_t rb_platform_sha256_file(const char* path, char* hex, size_t hex_size);
+const char* rb_platform_result_string(rb_platform_result_t result);
 
 #endif

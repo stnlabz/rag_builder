@@ -5,11 +5,38 @@
 
 #include "module_inventory.h"
 
-#define RB_MODULE_INVENTORY_FILENAME \
-    "module_inventory.conf"
+#define RB_MODULE_INVENTORY_FILENAME "module_inventory.conf"
 
 
-static int rb_module_inventory_record_valid(
+static int
+rb_hash_valid(
+    const char* hash
+)
+{
+    size_t i;
+
+    if (hash == NULL || strlen(hash) != 64)
+    {
+        return 0;
+    }
+
+    for (i = 0; i < 64; i++)
+    {
+        if (!(
+            (hash[i] >= '0' && hash[i] <= '9') ||
+            (hash[i] >= 'a' && hash[i] <= 'f')
+            ))
+        {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+
+static int
+rb_record_valid(
     const rb_module_inventory_record_t* record
 )
 {
@@ -23,14 +50,20 @@ static int rb_module_inventory_record_valid(
         return 0;
     }
 
-    if (record->qualification.tests_executed <
-        RB_MODULE_MIN_TESTS)
+    if (!rb_hash_valid(record->binary_sha256))
     {
         return 0;
     }
 
-    if (record->qualification.tests_passed !=
-        record->qualification.tests_executed)
+    if (record->qualification.tests_executed < RB_MODULE_MIN_TESTS)
+    {
+        return 0;
+    }
+
+    if (
+        record->qualification.tests_passed !=
+        record->qualification.tests_executed
+        )
     {
         return 0;
     }
@@ -40,8 +73,21 @@ static int rb_module_inventory_record_valid(
         return 0;
     }
 
-    if (!record->qualification.negative_test_executed ||
-        !record->qualification.negative_test_passed)
+    if (
+        record->qualification.tests_passed +
+        record->qualification.tests_failed !=
+        record->qualification.tests_executed
+        )
+    {
+        return 0;
+    }
+
+    if (!record->qualification.negative_test_executed)
+    {
+        return 0;
+    }
+
+    if (!record->qualification.negative_test_passed)
     {
         return 0;
     }
@@ -50,20 +96,19 @@ static int rb_module_inventory_record_valid(
 }
 
 
-void rb_module_inventory_init(
+void
+rb_module_inventory_init(
     rb_module_inventory_t* inventory
 )
 {
-    if (inventory == NULL)
+    if (inventory != NULL)
     {
-        return;
+        memset(
+            inventory,
+            0,
+            sizeof(*inventory)
+        );
     }
-
-    memset(
-        inventory,
-        0,
-        sizeof(*inventory)
-    );
 }
 
 
@@ -75,9 +120,11 @@ rb_module_inventory_configure(
 {
     int written;
 
-    if (inventory == NULL ||
+    if (
+        inventory == NULL ||
         output_path == NULL ||
-        output_path[0] == '\0')
+        output_path[0] == '\0'
+        )
     {
         return RB_MODULE_INVENTORY_ERR_INVALID_ARGUMENT;
     }
@@ -90,8 +137,10 @@ rb_module_inventory_configure(
         RB_MODULE_INVENTORY_FILENAME
     );
 
-    if (written < 0 ||
-        (size_t)written >= sizeof(inventory->path))
+    if (
+        written < 0 ||
+        (size_t)written >= sizeof(inventory->path)
+        )
     {
         return RB_MODULE_INVENTORY_ERR_PATH_TOO_LONG;
     }
@@ -105,40 +154,40 @@ rb_module_inventory_load(
     rb_module_inventory_t* inventory
 )
 {
-    FILE* file;
-    char line[512];
+    FILE* file = NULL;
+    char line[768];
 
-    if (inventory == NULL ||
-        inventory->path[0] == '\0')
+    if (
+        inventory == NULL ||
+        inventory->path[0] == '\0'
+        )
     {
         return RB_MODULE_INVENTORY_ERR_INVALID_ARGUMENT;
     }
 
     inventory->count = 0;
 
-    file = fopen(
-        inventory->path,
-        "r"
-    );
-
-    /*
-     * Missing inventory is not an error.
-     * It simply means no module has yet established
-     * persistent qualification.
-     */
-    if (file == NULL)
+    if (
+        fopen_s(
+            &file,
+            inventory->path,
+            "r"
+        ) != 0 ||
+        file == NULL
+        )
     {
         return RB_MODULE_INVENTORY_OK;
     }
 
-    while (fgets(
-        line,
-        sizeof(line),
-        file
-    ) != NULL)
+    while (
+        fgets(
+            line,
+            sizeof(line),
+            file
+        ) != NULL
+        )
     {
         rb_module_inventory_record_t record;
-
         int fields;
 
         memset(
@@ -147,61 +196,47 @@ rb_module_inventory_load(
             sizeof(record)
         );
 
-        fields = sscanf(
+        fields = sscanf_s(
             line,
-            "%63[^|]|%u|%u|%u|%u|%u|%u|%u|%u|%d|%d",
+            "%63[^|]|%u|%u|%u|%u|%u|%64[^|]|%u|%u|%u|%d|%d",
             record.module_id,
-
+            (unsigned)sizeof(record.module_id),
             &record.version_major,
             &record.version_minor,
             &record.version_patch,
-
             &record.core_api_major,
             &record.core_api_minor,
-
+            record.binary_sha256,
+            (unsigned)sizeof(record.binary_sha256),
             &record.qualification.tests_executed,
             &record.qualification.tests_passed,
             &record.qualification.tests_failed,
-
             &record.qualification.negative_test_executed,
             &record.qualification.negative_test_passed
         );
 
-        if (fields != 11)
+        if (
+            fields != 12 ||
+            !rb_record_valid(&record) ||
+            inventory->count >= RB_MODULE_INVENTORY_MAX
+            )
         {
             fclose(file);
 
             inventory->count = 0;
 
-            return RB_MODULE_INVENTORY_ERR_INVALID_FORMAT;
-        }
-
-        if (!rb_module_inventory_record_valid(
-            &record
-        ))
-        {
-            fclose(file);
-
-            inventory->count = 0;
-
-            return RB_MODULE_INVENTORY_ERR_INVALID_FORMAT;
-        }
-
-        if (inventory->count >=
-            RB_MODULE_INVENTORY_MAX)
-        {
-            fclose(file);
-
-            inventory->count = 0;
+            if (
+                fields != 12 ||
+                !rb_record_valid(&record)
+                )
+            {
+                return RB_MODULE_INVENTORY_ERR_INVALID_FORMAT;
+            }
 
             return RB_MODULE_INVENTORY_ERR_FULL;
         }
 
-        inventory->records[
-            inventory->count
-        ] = record;
-
-        inventory->count++;
+        inventory->records[inventory->count++] = record;
     }
 
     if (ferror(file))
@@ -224,58 +259,53 @@ rb_module_inventory_save(
     const rb_module_inventory_t* inventory
 )
 {
-    FILE* file;
-    size_t index;
+    FILE* file = NULL;
+    size_t i;
 
-    if (inventory == NULL ||
-        inventory->path[0] == '\0')
+    if (
+        inventory == NULL ||
+        inventory->path[0] == '\0'
+        )
     {
         return RB_MODULE_INVENTORY_ERR_INVALID_ARGUMENT;
     }
 
-    file = fopen(
-        inventory->path,
-        "w"
-    );
-
-    if (file == NULL)
+    if (
+        fopen_s(
+            &file,
+            inventory->path,
+            "w"
+        ) != 0 ||
+        file == NULL
+        )
     {
         return RB_MODULE_INVENTORY_ERR_OPEN_FAILED;
     }
 
-    for (index = 0;
-         index < inventory->count;
-         index++)
+    for (i = 0; i < inventory->count; i++)
     {
         const rb_module_inventory_record_t* record;
 
-        int written;
+        record = &inventory->records[i];
 
-        record =
-            &inventory->records[index];
-
-        written = fprintf(
-            file,
-            "%s|%u|%u|%u|%u|%u|%u|%u|%u|%d|%d\n",
-
-            record->module_id,
-
-            record->version_major,
-            record->version_minor,
-            record->version_patch,
-
-            record->core_api_major,
-            record->core_api_minor,
-
-            record->qualification.tests_executed,
-            record->qualification.tests_passed,
-            record->qualification.tests_failed,
-
-            record->qualification.negative_test_executed,
-            record->qualification.negative_test_passed
-        );
-
-        if (written < 0)
+        if (
+            fprintf(
+                file,
+                "%s|%u|%u|%u|%u|%u|%s|%u|%u|%u|%d|%d\n",
+                record->module_id,
+                record->version_major,
+                record->version_minor,
+                record->version_patch,
+                record->core_api_major,
+                record->core_api_minor,
+                record->binary_sha256,
+                record->qualification.tests_executed,
+                record->qualification.tests_passed,
+                record->qualification.tests_failed,
+                record->qualification.negative_test_executed,
+                record->qualification.negative_test_passed
+            ) < 0
+            )
         {
             fclose(file);
 
@@ -303,53 +333,51 @@ rb_module_inventory_result_t
 rb_module_inventory_store(
     rb_module_inventory_t* inventory,
     const rb_module_descriptor_t* descriptor,
+    const char* binary_sha256,
     const rb_module_qualification_result_t* qualification
 )
 {
-    rb_module_inventory_record_t* record;
+    rb_module_inventory_record_t* record = NULL;
+    size_t i;
 
-    size_t index;
-    size_t length;
-
-    if (inventory == NULL ||
+    if (
+        inventory == NULL ||
         descriptor == NULL ||
-        qualification == NULL)
+        binary_sha256 == NULL ||
+        qualification == NULL
+        )
     {
         return RB_MODULE_INVENTORY_ERR_INVALID_ARGUMENT;
     }
 
-    record = NULL;
-
-    for (index = 0;
-         index < inventory->count;
-         index++)
+    for (i = 0; i < inventory->count; i++)
     {
-        if (strcmp(
-            inventory->records[index].module_id,
-            descriptor->id
-        ) == 0)
+        if (
+            strcmp(
+                inventory->records[i].module_id,
+                descriptor->id
+            ) == 0
+            )
         {
-            record =
-                &inventory->records[index];
-
+            record = &inventory->records[i];
             break;
         }
     }
 
     if (record == NULL)
     {
-        if (inventory->count >=
-            RB_MODULE_INVENTORY_MAX)
+        if (
+            inventory->count >=
+            RB_MODULE_INVENTORY_MAX
+            )
         {
             return RB_MODULE_INVENTORY_ERR_FULL;
         }
 
         record =
             &inventory->records[
-                inventory->count
+                inventory->count++
             ];
-
-        inventory->count++;
     }
 
     memset(
@@ -358,20 +386,16 @@ rb_module_inventory_store(
         sizeof(*record)
     );
 
-    length = strlen(
+    strcpy_s(
+        record->module_id,
+        sizeof(record->module_id),
         descriptor->id
     );
 
-    if (length == 0 ||
-        length >= sizeof(record->module_id))
-    {
-        return RB_MODULE_INVENTORY_ERR_INVALID_ARGUMENT;
-    }
-
-    memcpy(
-        record->module_id,
-        descriptor->id,
-        length + 1
+    strcpy_s(
+        record->binary_sha256,
+        sizeof(record->binary_sha256),
+        binary_sha256
     );
 
     record->version_major =
@@ -392,9 +416,7 @@ rb_module_inventory_store(
     record->qualification =
         *qualification;
 
-    if (!rb_module_inventory_record_valid(
-        record
-    ))
+    if (!rb_record_valid(record))
     {
         return RB_MODULE_INVENTORY_ERR_INVALID_FORMAT;
     }
@@ -408,55 +430,54 @@ rb_module_inventory_store(
 const rb_module_inventory_record_t*
 rb_module_inventory_find(
     const rb_module_inventory_t* inventory,
-    const rb_module_descriptor_t* descriptor
+    const rb_module_descriptor_t* descriptor,
+    const char* binary_sha256
 )
 {
-    size_t index;
+    size_t i;
 
-    if (inventory == NULL ||
-        descriptor == NULL)
+    if (
+        inventory == NULL ||
+        descriptor == NULL ||
+        binary_sha256 == NULL
+        )
     {
         return NULL;
     }
 
-    for (index = 0;
-         index < inventory->count;
-         index++)
+    for (i = 0; i < inventory->count; i++)
     {
         const rb_module_inventory_record_t* record;
 
-        record =
-            &inventory->records[index];
+        record = &inventory->records[i];
 
-        if (strcmp(
-            record->module_id,
-            descriptor->id
-        ) != 0)
+        if (
+            strcmp(
+                record->module_id,
+                descriptor->id
+            ) != 0
+            )
         {
             continue;
         }
 
-        if (record->version_major !=
-                descriptor->version_major ||
+        if (
+            record->version_major !=
+            descriptor->version_major ||
             record->version_minor !=
-                descriptor->version_minor ||
+            descriptor->version_minor ||
             record->version_patch !=
-                descriptor->version_patch)
-        {
-            return NULL;
-        }
-
-        if (record->core_api_major !=
-                descriptor->required_core_api_major ||
+            descriptor->version_patch ||
+            record->core_api_major !=
+            descriptor->required_core_api_major ||
             record->core_api_minor !=
-                descriptor->required_core_api_minor)
-        {
-            return NULL;
-        }
-
-        if (!rb_module_inventory_record_valid(
-            record
-        ))
+            descriptor->required_core_api_minor ||
+            strcmp(
+                record->binary_sha256,
+                binary_sha256
+            ) != 0 ||
+            !rb_record_valid(record)
+            )
         {
             return NULL;
         }
@@ -468,7 +489,8 @@ rb_module_inventory_find(
 }
 
 
-const char* rb_module_inventory_result_string(
+const char*
+rb_module_inventory_result_string(
     rb_module_inventory_result_t result
 )
 {
